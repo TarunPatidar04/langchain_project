@@ -3,6 +3,7 @@ load_dotenv()
 
 from langchain_community.utilities import GoogleSerperAPIWrapper
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langgraph.checkpoint.memory import InMemorySaver
 from langchain_groq import ChatGroq
 from langchain.agents import create_agent
 from langchain.tools import tool
@@ -17,7 +18,8 @@ search=GoogleSerperAPIWrapper()
 agent=create_agent(
     model=llm,
     tools=[search.run],
-    system_prompt="you are a agent and can search for any question on google"
+    system_prompt="you are a agent and can search for any question on google",
+    checkpointer=InMemorySaver()
 )
 
 
@@ -27,7 +29,13 @@ while True:
         print("Good byeeeeee....!")
         break
 
-    response=agent.invoke({"messages":[{"role":"user","content":query}]})
+
+    response=agent.invoke(
+    {"messages":[{"role":"user","content":query}]},
+    {"configurable": {"thread_id": "history_save"}}
+    )
+
+
     print(response["messages"][-1].content[0]["text"].replace("**", ""))
 
 
