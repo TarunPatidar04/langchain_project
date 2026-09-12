@@ -13,9 +13,6 @@ from langchain.tools import tool
 from langgraph.checkpoint.memory import InMemorySaver
 import streamlit as st
 
-
-
-
 ## data in st session
 if "document_uploaded" not in st.session_state:
     st.session_state.document_uploaded = False
@@ -30,7 +27,6 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 
 
-
 def process_document(path):
     ## load the documents
 
@@ -38,26 +34,21 @@ def process_document(path):
     loader = PyPDFDirectoryLoader(path)
     docs = loader.load()
 
-
     ## split into chunks
     splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
     split_text = splitter.split_documents(documents=docs)
 
-
     ## embedding and vector DB
     # embeddings = GoogleGenerativeAIEmbeddings(model="gemini-embedding-2")
-    embeddings = GoogleGenerativeAIEmbeddings(model="gemini-embedding-001")
-
+    embeddings = GoogleGenerativeAIEmbeddings(model="gemini-embedding-2-preview")
 
     vector_db = InMemoryVectorStore.from_documents(
         documents=split_text, embedding=embeddings
     )
 
-
     ## create a Agent - tool , llm , prompt
 
     llm = ChatGroq(model="openai/gpt-oss-20b")
-
 
     @tool
     def retrive_context(query: str):
@@ -68,10 +59,9 @@ def process_document(path):
 
         docs = vector_db.similarity_search(query=query, k=3)
         for doc in docs:
-            context = doc.page_content + "\n\n"
+            context += doc.page_content + "\n\n"
 
         return context
-
 
     system_prompt = """
     you are a helpful assistant that answers questions using retrived context
@@ -79,19 +69,17 @@ def process_document(path):
     always use the 'retrive_context' tool for questions requiring external knowlege.
     """
 
-
     memory = InMemorySaver()
-
 
     agent = create_agent(
         model=llm,
-        tools=[retrive_context], 
-        system_prompt=system_prompt, 
-        checkpointer=memory
+        tools=[retrive_context],
+        system_prompt=system_prompt,
+        checkpointer=memory,
     )
 
-    st.session_state.agent=agent
-    st.session_state.document_uploaded=True
+    st.session_state.agent = agent
+    st.session_state.document_uploaded = True
 
 
 # while True:
@@ -108,11 +96,24 @@ def process_document(path):
 #     print("AI : ", result)
 
 
-
 # upload UI
 
 if not st.session_state.document_uploaded:
-    uploaded=st.file_uploader(label="Select PDF Files",type=["pdf"],accept_multiple_files=True)
+    st.markdown(
+        """
+            <div style="text-align:center; padding: 40px 0 25px 0;">
+                <h1 style="margin-bottom: 10px;">📄 Document AI Assistant</h1>
+                <p style="color: #888; font-size: 16px;">
+                    Ask anything about your uploaded documents
+                </p>
+            </div>
+            """,
+        unsafe_allow_html=True,
+    )
+
+    uploaded = st.file_uploader(
+        label="Select PDF Files", type=["pdf"], accept_multiple_files=True
+    )
     if uploaded:
         with st.spinner("Processing..."):
             path = "./docs_files/"
@@ -126,80 +127,38 @@ if not st.session_state.document_uploaded:
 
 # chat UI
 if st.session_state.document_uploaded and st.session_state.agent:
+    # ---------- Header ----------
+    st.markdown(
+        """
+        <div style="text-align:center; padding: 40px 0 25px 0;">
+            <h1 style="margin-bottom: 10px;">📄 Document AI Assistant</h1>
+            <p style="color: #888; font-size: 16px;">
+                Ask anything about your uploaded documents
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     for message in st.session_state.messages:
-        role=message.get("role")
-        content=message.get("content")
+        role = message.get("role")
+        content = message.get("content")
         st.chat_message(role).markdown(content)
-  
 
-
-    query=st.chat_input("Ask Anything related to uploaded document....")
-
+    query = st.chat_input("Ask Anything related to uploaded document....")
 
     if query:
-        st.session_state.messages.append({"role":"user","content":query})
+        st.session_state.messages.append({"role": "user", "content": query})
         st.chat_message("user").markdown(query)
-        response=st.session_state.agent.invoke(
-            {"messages":[{"role":"user","content":query}]},
-            {"configurable": {"thread_id": 1}}
 
+        response = st.session_state.agent.invoke(
+            {"messages": [{"role": "user", "content": query}]},
+            {"configurable": {"thread_id": 1}},
         )
 
-
-        answer=response["messages"][-1].content
+        answer = response["messages"][-1].content
         st.chat_message("ai").markdown(answer)
-        st.session_state.messages.append({"role":"ai","content":answer})
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        st.session_state.messages.append({"role": "ai", "content": answer})
 
 
 # --------------------------------------------------------------------------------------------------------
